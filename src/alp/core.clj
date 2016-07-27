@@ -1,7 +1,7 @@
 
 (ns alp.core
 (:require [manifold.deferred :as d]
-          [manifold.stream :as s]
+          [manifold.stream :as ms]
           [clojure.edn :as edn]
           [aleph.tcp :as tcp]
           [gloss.core :as gloss]
@@ -37,15 +37,15 @@
 ;; messages.  We must combine that with a decoded view of the incoming stream, which is
 ;; accomplished via `gloss.io/decode-stream`.
 (defn wrap-duplex-stream
-  [protocol s]
-  (let [out (s/stream)]
-    (s/connect
-      (s/map #(gio/encode protocol %) out)
-      s)
+  [protocol stream]
+  (let [out (ms/stream)]
+    (ms/connect
+      (ms/map #(gio/encode protocol %) out)
+      stream)
 
-    (s/splice
+    (ms/splice
       out
-      (gio/decode-stream s protocol))))
+      (gio/decode-stream stream protocol))))
 
 ;; The call to `aleph.tcp/client` returns a deferred, which will yield a duplex stream that
 ;; can be used to both send and receive bytes. We asynchronously compose over this value using
@@ -64,11 +64,11 @@
   [handler port]
   (println "Start command")
   (tcp/start-server
-    (fn [s info]
+    (fn [stream info]
       (println info)
       ; is visible to telnet clients
-      (.start (Thread. (fn [& args] (while true (Thread/sleep 3000) (s/put! s "test")) )))
-      (handler (wrap-duplex-stream protocol s) info))
+      (.start (Thread. (fn [& args] (while true (Thread/sleep 3000) (ms/put! stream "test")) )))
+      (handler (wrap-duplex-stream protocol stream) info))
     {:port port}))
 
 ;; ## echo servers
@@ -81,10 +81,10 @@
 ;; stream this is simply an easy way to create an echo server.
 (defn fast-echo-handler
   [f]
-  (fn [s info]
-    (s/connect
-      (s/map (comp think f) s)
-      s)))
+  (fn [stream info]
+    (ms/connect
+      (ms/map (comp think f) stream)
+      stream)))
 
 ;; ### demonstration
 
