@@ -67,14 +67,32 @@
     (fn [stream info]
       (println info)
       ; is visible to telnet clients
-      (.start (Thread. (fn [& args] (while true (Thread/sleep 3000) (ms/put! stream "test")) )))
+      (.start (Thread. (fn [& args]
+                        (while true
+                          (Thread/sleep 3000)
+                          (ms/put! stream "test")
+                          (ms/put! stream
+                            (gio/encode protocol {:a 1}))
+
+                          ) )))
       (handler (wrap-duplex-stream protocol stream) info))
     {:port port}))
 
 ;; ## echo servers
 (defn think [& args]
   (println args)
-  args
+  (first args)
+  )
+
+(defn safe [f & args]
+  (try
+    (apply f args)
+    (catch Throwable t
+      (do (print "Exception" (.getMessage t)
+      "error"
+      ))
+      )
+    )
   )
 ;; This creates a handler which will apply `f` to any incoming message, and immediately
 ;; send back the result.  Notice that we are connecting `s` to itself, but since it is a duplex
@@ -83,7 +101,7 @@
   [f]
   (fn [stream info]
     (ms/connect
-      (ms/map (comp think f) stream)
+      (ms/map (comp think (partial safe f)) stream)
       stream)))
 
 ;; ### demonstration
